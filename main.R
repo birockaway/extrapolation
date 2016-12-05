@@ -6,7 +6,7 @@ library(chron)
 
 # DEVELOPEMENT ["devel"] / PRODUCTION ["prod"]?
 # files in local are stored differently so you have to choose the enviroment mode
-my_environment<-"devel"
+my_environment<-"prod"
 
 # KBC PARAMETERS
 if (my_environment=='devel') {

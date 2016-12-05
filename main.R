@@ -4,6 +4,25 @@ devtools::install_github("twitter/AnomalyDetection")
 library(AnomalyDetection)
 library(chron)
 
+# DEVELOPEMENT ["devel"] / PRODUCTION ["prod"]?
+# files in local are stored differently so you have to choose the enviroment mode
+my_environment<-"devel"
+
+# KBC PARAMETERS
+if (my_environment=='devel') {
+  #only for local use - in KBC the r-docker-application library is installed by default
+  devtools::install_github('keboola/r-docker-application', ref = 'master')
+  library(keboola.r.docker.application)
+  # initialize application
+  app <- keboola.r.docker.application::DockerApplication$new('in')
+  app$readConfig()
+} else {
+  library(keboola.r.docker.application)
+  # initialize application
+  app <- keboola.r.docker.application::DockerApplication$new('/data/')
+  app$readConfig()
+}
+
 ### /FUNCTIONS DECLARATION SECTION ###
 
 # END_OF_MONTH FCN
@@ -19,7 +38,7 @@ days_of_month_remain = function() {
 }
 
 fill_the_dates=function(df){
-  dates<-seq(as.POSIXct(min(df$date),tz='UTC'), as.POSIXct(Sys.Date()-2,tz='UTC'), "days")
+  dates<-seq(as.POSIXct(min(df$date),tz='UTC'), as.POSIXct(Sys.Date()-1,tz='UTC'), "days")
   missing_index<-!(dates %in% df$date)
   
   fill_up<-df[1,]
@@ -97,7 +116,7 @@ forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,i
     }else{
       if (multi_seasonal==T&metric!="cost") {
         mkt_data_src_ts<-msts(mkt_data_src[,metric],seasonal.periods = c(in_frequency,365.25),start=min(mkt_data_src[,"date"]))
-        fit<-tbats(mkt_data_src_ts)
+        fit<-tbats(mkt_data_src_ts,use.damped.trend=T)
         if (plot==T) {plot(forecast(fit),main=paste("Two seasson Forecast -",metric))}
         fcst_end_of_month_vals<-forecast(fit,31*3)$mean
       } else {
@@ -155,39 +174,37 @@ mkt_data_out<-mkt_data
 #mkt_data_out2<-mkt_data
 
 ForecastGroups<-unique(mkt_data$ForecastGroup)
-web_ids<-unique(mkt_data$web)
+#web_ids<-unique(mkt_data$web)
+# access the supplied value of 'web'
+web_ids<-app$getParameters()$web
+
 # cut data to the current day
 mkt_data<-mkt_data[mkt_data$date<as.POSIXct(Sys.Date(),tz='UTC'),]
 #ChannelTypes<-unique(sources_bridge$ChannelType)
 #ForecastGroup<-ForecastGroups[1]
 #web_id<-web_ids[3]
+
 for (web_id in web_ids) {
   print(paste("Web_id",web_id,"ready to forecast..."))
   for (ForecastGroup in ForecastGroups) {
     ChannelType<-sources_bridge[sources_bridge$ForecastGroup==ForecastGroup,'ChannelType'][1]
     #undebug(forecast_this_month)
-    if (web_id==21) {
       forecast<-forecast_this_month(mkt_data,c('sessions','transactions','transactionrevenue','cost'),web_id,ForecastGroup,ChannelType,in_frequency=7,anomalies=T,multi_seasonal =T,plot=F)
-    } else {
-      forecast<-forecast_this_month(mkt_data,c('sessions','transactions','transactionrevenue','cost'),web_id,ForecastGroup,ChannelType,in_frequency=7,anomalies=T,multi_seasonal =F)  
-    }
-    #forecast3<-forecast_this_month(mkt_data,c('sessions','transactions','transactionrevenue','cost'),web_id,ForecastGroup,ChannelType,14)
-    #forecast4<-forecast_this_month(mkt_data,c('sessions','transactions','transactionrevenue','cost'),web_id,ForecastGroup,ChannelType,7,'autoarima')
-    
+      
     #compare plot
     metrics<-c('cost','sessions')
     mkt_data_src<-mkt_data[mkt_data$ForecastGroup==ForecastGroup,]
     mkt_data_src<-mkt_data_src[order(mkt_data_src$date),]
-    do_plot<-F
+    do_plot<-T
     #mkt_data_src<-rbind(mkt_data_src[,c('ForecastGroup','web','date',metric)],forecast2[,c('ForecastGroup','web','date',metric)])
     if (nrow(mkt_data_src[mkt_data_src$web==web_id,])>0 & do_plot==T) {
       #plot prvni metriky
       mkt_data_src<-fill_the_dates(mkt_data_src[mkt_data_src$web==web_id,])
-      plot(c(mkt_data_src[mkt_data_src$web==web_id,metrics[1]],rep(NA,nrow(forecast2))),type='l',main=ForecastGroup,ylim=c(min(min(mkt_data_src[,metrics[1]]),min(mkt_data_src[,metrics[2]])),max(max(mkt_data_src[,metrics[1]]),max(mkt_data_src[,metrics[2]]))))
+      plot(c(mkt_data_src[mkt_data_src$web==web_id,metrics[1]],rep(NA,nrow(forecast))),type='l',main=ForecastGroup,ylim=c(min(min(mkt_data_src[,metrics[1]]),min(mkt_data_src[,metrics[2]])),max(max(mkt_data_src[,metrics[1]]),max(mkt_data_src[,metrics[2]]))))
       lines(c(rep(NA,nrow(mkt_data_src[mkt_data_src$web==web_id,])),forecast[,metrics[1]]),type='l',col='red')
       #lines(c(rep(NA,nrow(mkt_data_src[mkt_data_src$web==web_id,])),forecast2[,metrics[1]]),type='l',col='green')
       #plot druhe metriky
-      lines(c(mkt_data_src[mkt_data_src$web==web_id,metrics[2]],rep(NA,nrow(forecast2))),type='l',lty=2,main=ForecastGroup)
+      lines(c(mkt_data_src[mkt_data_src$web==web_id,metrics[2]],rep(NA,nrow(forecast))),type='l',lty=2,main=ForecastGroup)
       lines(c(rep(NA,nrow(mkt_data_src[mkt_data_src$web==web_id,])),forecast[,metrics[2]]),type='l',lty=2,col='blue')
       #lines(c(rep(NA,nrow(mkt_data_src[mkt_data_src$web==web_id,])),forecast2[,metrics[2]]),type='l',lty=2,col='green')
     }

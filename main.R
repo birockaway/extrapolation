@@ -233,5 +233,5 @@ if (as.numeric(days(Sys.Date()))%in%snapshotting_days) {
   mkt_data_out_snap[,"snap_date"]<-numeric(0)
 }
 
-write.csv(mkt_data_out_snap,file = "out/tables/extrapolation_out_snap.csv", row.names = FALSE)
+#write.csv(mkt_data_out_snap,file = "out/tables/extrapolation_out_snap.csv", row.names = FALSE)
 write.csv(mkt_data_out,file = "out/tables/extrapolation_out.csv", row.names = FALSE)

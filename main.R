@@ -38,6 +38,7 @@ days_of_month_remain = function() {
 }
 
 fill_the_dates=function(df){
+  df<-df[as.POSIXct(df$date)>=as.POSIXct('2014-01-01'),]
   dates<-seq(as.POSIXct(min(df$date),tz='UTC'), as.POSIXct(Sys.Date()-1,tz='UTC'), "days")
   missing_index<-!(dates %in% df$date)
   
@@ -232,5 +233,5 @@ if (as.numeric(days(Sys.Date()))%in%snapshotting_days) {
   mkt_data_out_snap[,"snap_date"]<-numeric(0)
 }
 
-#write.csv(mkt_data_out_snap,file = "out/tables/extrapolation_out_snap.csv", row.names = FALSE)
+write.csv(mkt_data_out_snap,file = "out/tables/extrapolation_out_snap.csv", row.names = FALSE)
 write.csv(mkt_data_out,file = "out/tables/extrapolation_out.csv", row.names = FALSE)

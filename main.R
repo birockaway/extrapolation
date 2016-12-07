@@ -6,10 +6,10 @@ library(chron)
 
 # DEVELOPEMENT ["devel"] / PRODUCTION ["prod"]?
 # files in local are stored differently so you have to choose the enviroment mode
-my_environment<-"prod"
+my_environment<-"devel"
 
 # KBC PARAMETERS
-if (my_environment=='devel') {
+if (my_environment=='prod') {
   #only for local use - in KBC the r-docker-application library is installed by default
   devtools::install_github('keboola/r-docker-application', ref = 'master')
   library(keboola.r.docker.application)
@@ -115,9 +115,9 @@ forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,i
     if ((nrow(mkt_data_src)/in_frequency)<=2) {
       fcst_end_of_month_vals<-rep(mean(mkt_data_src[,metric]),days_of_month_remain())
     }else{
-      if (multi_seasonal==T&metric!="cost") {
-        mkt_data_src_ts<-msts(mkt_data_src[,metric],seasonal.periods = c(in_frequency,365.25),start=min(mkt_data_src[,"date"]))
-        fit<-tbats(mkt_data_src_ts,use.damped.trend=T)
+      if (multi_seasonal==T&metric!="cost"&((length(mkt_data_src_ts)-min(which(mkt_data_src_ts>0)))>365*2)) {
+          mkt_data_src_ts<-msts(mkt_data_src[,metric],seasonal.periods = c(in_frequency,365.25),start=min(mkt_data_src[,"date"]))
+          fit<-tbats(mkt_data_src_ts,use.damped.trend=T)
         if (plot==T) {plot(forecast(fit),main=paste("Two seasson Forecast -",metric))}
         fcst_end_of_month_vals<-forecast(fit,31*3)$mean
       } else {

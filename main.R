@@ -4,6 +4,9 @@ devtools::install_github("twitter/AnomalyDetection")
 library(AnomalyDetection)
 library(chron)
 
+# prevent scientific notation in numerics
+options(scipen=999)
+
 # DEVELOPEMENT ["devel"] / PRODUCTION ["prod"]?
 # files in local are stored differently so you have to choose the enviroment mode
 my_environment<-"prod"
@@ -153,7 +156,7 @@ forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,i
   }
   forecast_df_out<-forecast_df[[1]][,c('ForecastGroup','web','date')]
   for (metric in metrics) {
-    forecast_df_out[,metric]<-forecast_df[[metric]][,4]
+    forecast_df_out[,metric]<-round(abs(forecast_df[[metric]][,4]),4)
   }
   return(forecast_df_out)
 }

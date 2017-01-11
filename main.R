@@ -122,7 +122,7 @@ forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,i
       if (multi_seasonal==T&metric!="cost"&((length(mkt_data_src[,metric])-min(which(mkt_data_src[,metric]>0)))>365*2)) {
         options(warn=0)
           mkt_data_src_ts<-msts(mkt_data_src[,metric],seasonal.periods = c(in_frequency,365.25),start=min(mkt_data_src[,"date"]))
-          fit<-tbats(mkt_data_src_ts,use.damped.trend=T)
+          fit<-tbats(mkt_data_src_ts,use.parallel = T)
         if (plot==T) {plot(forecast(fit),main=paste("Two seasson Forecast -",metric))}
         fcst_end_of_month_vals<-forecast(fit,31*3)$mean
       } else {

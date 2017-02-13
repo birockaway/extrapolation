@@ -121,8 +121,8 @@ forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,i
       options(warn=-1)
       if (multi_seasonal==T&metric!="cost"&((length(mkt_data_src[,metric])-min(which(mkt_data_src[,metric]>0)))>365*2)) {
         options(warn=0)
-          mkt_data_src_ts<-msts(mkt_data_src[,metric],seasonal.periods = c(in_frequency,365.25),start=min(mkt_data_src[,"date"]))
-          fit<-tbats(mkt_data_src_ts,use.parallel = T)
+        mkt_data_src_ts<-msts(mkt_data_src[,metric],seasonal.periods = c(in_frequency,365.25),start=min(mkt_data_src[,"date"]))
+        fit<-tbats(mkt_data_src_ts,use.damped.trend=T)
         if (plot==T) {plot(forecast(fit),main=paste("Two seasson Forecast -",metric))}
         fcst_end_of_month_vals<-forecast(fit,31*3)$mean
       } else {
@@ -161,6 +161,17 @@ forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,i
   return(forecast_df_out)
 }
 
+# select batch of web_ids on the basis of config parameters (eg. second 1/6 of webids)
+select_web_ids<-function(parameters,structure) {
+  web_batch<-parameters$web_batch
+  if (parameters$metric_type=='session_granularity'){
+    web_ids_all<-structure[structure$division=='all'&!is.na(structure$division)&structure$status=='on',"pk"]
+    step<-ceiling(length(web_ids_all)/web_batch$denominator)
+    
+    web_ids<-unlist(lapply(web_batch$numerator,function(numerator) web_ids_all[((numerator-1)*step+1):(min(length(web_ids_all),(numerator)*step))]))
+  }
+  return(web_ids)
+}
 
 ### FUNCTIONS DECLARATION SECTION/ ###
 
@@ -169,6 +180,7 @@ forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,i
 
 ### /DATASET HANDLING ###
 sources_bridge<-read.csv("in/tables/sources_bridge.csv",stringsAsFactors = F)
+structure<-read.csv("in/tables/structure.csv",stringsAsFactors = F)
 mkt_data_original<-read.csv("in/tables/extrapolation_ini.csv",stringsAsFactors = F)
 mkt_data<-mkt_data_original
 mkt_data$date<-as.POSIXct(mkt_data$date,tz='UTC')
@@ -183,7 +195,8 @@ mkt_data_out<-mkt_data
 ForecastGroups<-unique(mkt_data$ForecastGroup)
 #web_ids<-unique(mkt_data$web)
 # access the supplied value of 'web'
-web_ids<-app$getParameters()$web
+
+web_ids<-select_web_ids(app$getParameters(),structure)
 
 # cut data to the current day
 mkt_data<-mkt_data[mkt_data$date<as.POSIXct(Sys.Date(),tz='UTC'),]
@@ -196,8 +209,8 @@ for (web_id in web_ids) {
   for (ForecastGroup in ForecastGroups) {
     ChannelType<-sources_bridge[sources_bridge$ForecastGroup==ForecastGroup,'ChannelType'][1]
     #undebug(forecast_this_month)
-      forecast<-forecast_this_month(mkt_data,c('sessions','transactions','transactionrevenue','cost'),web_id,ForecastGroup,ChannelType,in_frequency=7,anomalies=T,multi_seasonal =T,plot=F)
-      
+    forecast<-forecast_this_month(mkt_data,c('sessions','transactions','transactionrevenue','cost'),web_id,ForecastGroup,ChannelType,in_frequency=7,anomalies=T,multi_seasonal =T,plot=F)
+    
     #compare plot
     metrics<-c('cost','sessions')
     mkt_data_src<-mkt_data[mkt_data$ForecastGroup==ForecastGroup,]

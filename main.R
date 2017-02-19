@@ -9,10 +9,10 @@ options(scipen=999)
 
 # DEVELOPEMENT ["devel"] / PRODUCTION ["prod"]?
 # files in local are stored differently so you have to choose the enviroment mode
-my_environment<-"prod"
+my_environment<-"devel"
 
 # KBC PARAMETERS
-if (my_environment=='devel') {
+if (my_environment=='prod') {
   #only for local use - in KBC the r-docker-application library is installed by default
   devtools::install_github('keboola/r-docker-application', ref = 'master')
   library(keboola.r.docker.application)
@@ -40,7 +40,7 @@ days_of_month_remain = function() {
   return (i)
 }
 
-fill_the_dates=function(df){
+fill_the_dates=function(df,metrics){
   df<-df[as.POSIXct(df$date)>=as.POSIXct('2014-01-01'),]
   dates<-seq(as.POSIXct(min(df$date),tz='UTC'), as.POSIXct(Sys.Date()-1,tz='UTC'), "days")
   missing_index<-!(dates %in% df$date)
@@ -50,7 +50,7 @@ fill_the_dates=function(df){
     for (i in 1:length(dates[missing_index])){
       fill_up[i,]<-df[1,]
       fill_up[i,'date']<-dates[missing_index][i]
-      fill_up[i,4:length(df)]<-rep(0,length(df)-3)  
+      fill_up[i,metrics]<-rep(0,length(metrics))  
     }
     df_filled<-rbind(df,fill_up)  
     df_filled<-df_filled[order(df_filled$date),]
@@ -96,7 +96,7 @@ forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,i
   mkt_data_src<-mkt_data[mkt_data$ForecastGroup==ForecastGroup&mkt_data$web==web_id,]
   #check if there are any records on this metric/source
   if (nrow(mkt_data_src)==0) { return(mkt_data_src) }
-  mkt_data_src_all<-fill_the_dates(mkt_data_src)
+  mkt_data_src_all<-fill_the_dates(mkt_data_src,metrics)
   
   forecast_df<-list()
   for (metric in metrics) {
@@ -163,14 +163,29 @@ forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,i
 
 # select batch of web_ids on the basis of config parameters (eg. second 1/6 of webids)
 select_web_ids<-function(parameters,structure) {
+  structure<-structure[structure$status!="",]
+  structure[is.na(structure$division),"division"]<-"NA"
   web_batch<-parameters$web_batch
   if (parameters$metric_type=='session_granularity'){
     web_ids_all<-structure[structure$division=='all'&!is.na(structure$division)&structure$status=='on',"pk"]
     step<-ceiling(length(web_ids_all)/web_batch$denominator)
-    
-    web_ids<-unlist(lapply(web_batch$numerator,function(numerator) web_ids_all[((numerator-1)*step+1):(min(length(web_ids_all),(numerator)*step))]))
+  } else if (parameters$metric_type=='product_granularity') {
+    web_ids_all<-structure[structure$division!='all'&!is.na(structure$division)&structure$status=='on',"pk"]
+    step<-ceiling(length(web_ids_all)/web_batch$denominator)
   }
+  web_ids<-unlist(lapply(web_batch$numerator,function(numerator) web_ids_all[((numerator-1)*step+1):(min(length(web_ids_all),(numerator)*step))]))
+  
   return(web_ids)
+}
+
+select_metrics<-function(parameters){
+  if (parameters$metric_type=='session_granularity') {
+    metrics<-c('sessions','transactions','transactionrevenue','cost')
+  } else if (parameters$metric_type=='product_granularity'){
+    metrics<-c("item_revenue","division_cost")
+  } else {stop("Wrong type of granularity set!")}
+  
+  return(metrics)
 }
 
 ### FUNCTIONS DECLARATION SECTION/ ###
@@ -179,6 +194,9 @@ select_web_ids<-function(parameters,structure) {
 
 
 ### /DATASET HANDLING ###
+metrics<-select_metrics(app$getParameters())
+ForecastGroups<-unique(mkt_data$ForecastGroup)
+
 sources_bridge<-read.csv("in/tables/sources_bridge.csv",stringsAsFactors = F)
 structure<-read.csv("in/tables/structure.csv",stringsAsFactors = F)
 mkt_data_original<-read.csv("in/tables/extrapolation_ini.csv",stringsAsFactors = F)
@@ -189,37 +207,35 @@ mkt_data<-mkt_data[!is.na(mkt_data$ForecastGroup),]
 ### DATASET HANDLING/ ###
 
 #results
-mkt_data_out<-mkt_data
+mkt_data_out<-mkt_data[,c("ForecastGroup","web","date",metrics)]
 #mkt_data_out2<-mkt_data
 
-ForecastGroups<-unique(mkt_data$ForecastGroup)
-#web_ids<-unique(mkt_data$web)
-# access the supplied value of 'web'
 
+#undebug(select_web_ids)
 web_ids<-select_web_ids(app$getParameters(),structure)
 
 # cut data to the current day
 mkt_data<-mkt_data[mkt_data$date<as.POSIXct(Sys.Date(),tz='UTC'),]
 #ChannelTypes<-unique(sources_bridge$ChannelType)
 #ForecastGroup<-ForecastGroups[1]
-#web_id<-web_ids[3]
+#web_id<-web_ids[2]
+
+
 
 for (web_id in web_ids) {
   print(paste("Web_id",web_id,"ready to forecast..."))
   for (ForecastGroup in ForecastGroups) {
     ChannelType<-sources_bridge[sources_bridge$ForecastGroup==ForecastGroup,'ChannelType'][1]
     #undebug(forecast_this_month)
-    forecast<-forecast_this_month(mkt_data,c('sessions','transactions','transactionrevenue','cost'),web_id,ForecastGroup,ChannelType,in_frequency=7,anomalies=T,multi_seasonal =T,plot=F)
-    
+    forecast<-forecast_this_month(mkt_data,metrics,web_id,ForecastGroup,ChannelType,in_frequency=7,anomalies=T,multi_seasonal =T,plot=F)
     #compare plot
-    metrics<-c('cost','sessions')
     mkt_data_src<-mkt_data[mkt_data$ForecastGroup==ForecastGroup,]
     mkt_data_src<-mkt_data_src[order(mkt_data_src$date),]
     do_plot<-T
     #mkt_data_src<-rbind(mkt_data_src[,c('ForecastGroup','web','date',metric)],forecast2[,c('ForecastGroup','web','date',metric)])
     if (nrow(mkt_data_src[mkt_data_src$web==web_id,])>0 & do_plot==T) {
       #plot prvni metriky
-      mkt_data_src<-fill_the_dates(mkt_data_src[mkt_data_src$web==web_id,])
+      mkt_data_src<-fill_the_dates(mkt_data_src[mkt_data_src$web==web_id,],metrics)
       plot(c(mkt_data_src[mkt_data_src$web==web_id,metrics[1]],rep(NA,nrow(forecast))),type='l',main=ForecastGroup,ylim=c(min(min(mkt_data_src[,metrics[1]]),min(mkt_data_src[,metrics[2]])),max(max(mkt_data_src[,metrics[1]]),max(mkt_data_src[,metrics[2]]))))
       lines(c(rep(NA,nrow(mkt_data_src[mkt_data_src$web==web_id,])),forecast[,metrics[1]]),type='l',col='red')
       #lines(c(rep(NA,nrow(mkt_data_src[mkt_data_src$web==web_id,])),forecast2[,metrics[1]]),type='l',col='green')

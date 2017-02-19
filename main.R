@@ -9,10 +9,10 @@ options(scipen=999)
 
 # DEVELOPEMENT ["devel"] / PRODUCTION ["prod"]?
 # files in local are stored differently so you have to choose the enviroment mode
-my_environment<-"devel"
+my_environment<-"prod"
 
 # KBC PARAMETERS
-if (my_environment=='prod') {
+if (my_environment=='devel') {
   #only for local use - in KBC the r-docker-application library is installed by default
   devtools::install_github('keboola/r-docker-application', ref = 'master')
   library(keboola.r.docker.application)
@@ -194,12 +194,13 @@ select_metrics<-function(parameters){
 
 
 ### /DATASET HANDLING ###
-metrics<-select_metrics(app$getParameters())
-web_ids<-select_web_ids(app$getParameters(),structure)
-
 sources_bridge<-read.csv("in/tables/sources_bridge.csv",stringsAsFactors = F)
 structure<-read.csv("in/tables/structure.csv",stringsAsFactors = F)
 mkt_data_original<-read.csv("in/tables/extrapolation_ini.csv",stringsAsFactors = F)
+
+metrics<-select_metrics(app$getParameters())
+web_ids<-select_web_ids(app$getParameters(),structure)
+
 mkt_data<-mkt_data_original
 mkt_data$date<-as.POSIXct(mkt_data$date,tz='UTC')
 mkt_data<-mkt_data[!is.na(mkt_data$ForecastGroup),]

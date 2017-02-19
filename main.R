@@ -195,7 +195,7 @@ select_metrics<-function(parameters){
 
 ### /DATASET HANDLING ###
 metrics<-select_metrics(app$getParameters())
-ForecastGroups<-unique(mkt_data$ForecastGroup)
+web_ids<-select_web_ids(app$getParameters(),structure)
 
 sources_bridge<-read.csv("in/tables/sources_bridge.csv",stringsAsFactors = F)
 structure<-read.csv("in/tables/structure.csv",stringsAsFactors = F)
@@ -210,9 +210,8 @@ mkt_data<-mkt_data[!is.na(mkt_data$ForecastGroup),]
 mkt_data_out<-mkt_data[,c("ForecastGroup","web","date",metrics)]
 #mkt_data_out2<-mkt_data
 
-
-#undebug(select_web_ids)
-web_ids<-select_web_ids(app$getParameters(),structure)
+# select all valid ForecastGroups
+ForecastGroups<-unique(mkt_data$ForecastGroup)
 
 # cut data to the current day
 mkt_data<-mkt_data[mkt_data$date<as.POSIXct(Sys.Date(),tz='UTC'),]

@@ -110,6 +110,26 @@ forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,i
     # transfer to time series
     if ((nrow(mkt_data_src)/in_frequency)<=2) {in_frequency<-14}
     
+forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,in_frequency,anomalies=T,multi_seasonal=F,method='autoforecast',plot=F) {
+  
+  ### /DATASET HANDLING ###
+  mkt_data_src<-mkt_data[mkt_data$ForecastGroup==ForecastGroup&mkt_data$web==web_id,]
+  #check if there are any records on this metric/source
+  if (nrow(mkt_data_src)==0) { return(mkt_data_src) }
+  mkt_data_src_all<-fill_the_dates(mkt_data_src,metrics)
+  
+  forecast_df<-list()
+  for (metric in metrics) {
+    mkt_data_src<-mkt_data_src_all[,c('date',metric)]
+    mkt_data_src<-mkt_data_src[order(mkt_data_src$date),]
+    mkt_data_src<-mkt_data_src[(min(which(diff(mkt_data_src[,2])>0))+1):nrow(mkt_data_src),]
+    ### DATASET HANDLING/ ###
+    
+    
+    #### /FORECAST SECTION ###
+    # transfer to time series
+    if ((nrow(mkt_data_src)/in_frequency)<=2) {in_frequency<-14}
+    
     #plots
     #plot(decompose(mkt_data_src_ts))
     #plot(forecast(mkt_data_src_ts))
@@ -137,7 +157,7 @@ forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,i
         } else {
           mkt_data_src<-mkt_data_src[mkt_data_src$date>as.POSIXct(Sys.Date()-120,tz='UTC'),]
           mkt_data_src_ts<-ts(mkt_data_src[,metric],frequency = in_frequency)
-          fcst_end_of_month_vals<-forecast(mkt_data_src_ts,31*3)$mean
+          fcst_end_of_month_vals<-forecast(stl(mkt_data_src_ts,s.window=7),h=31*3)$mean
         }
       }
       for (i in (1:length(fcst_end_of_month_vals))){
@@ -227,7 +247,7 @@ for (web_id in web_ids) {
   for (ForecastGroup in ForecastGroups) {
     ChannelType<-sources_bridge[sources_bridge$ForecastGroup==ForecastGroup,'ChannelType'][1]
     #undebug(forecast_this_month)
-    forecast<-forecast_this_month(mkt_data,metrics,web_id,ForecastGroup,ChannelType,in_frequency=7,anomalies=T,multi_seasonal =T,plot=F)
+    forecast<-forecast_this_month(mkt_data,metrics,web_id,ForecastGroup,ChannelType,in_frequency=7,anomalies=F,multi_seasonal =T,plot=F)
     #compare plot
     mkt_data_src<-mkt_data[mkt_data$ForecastGroup==ForecastGroup,]
     mkt_data_src<-mkt_data_src[order(mkt_data_src$date),]

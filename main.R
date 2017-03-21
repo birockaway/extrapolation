@@ -102,26 +102,6 @@ forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,i
   for (metric in metrics) {
     mkt_data_src<-mkt_data_src_all[,c('date',metric)]
     mkt_data_src<-mkt_data_src[order(mkt_data_src$date),]
-    #plot(mkt_data_src$date,mkt_data_src[,metric],type='l')
-    ### DATASET HANDLING/ ###
-    
-    
-    #### /FORECAST SECTION ###
-    # transfer to time series
-    if ((nrow(mkt_data_src)/in_frequency)<=2) {in_frequency<-14}
-    
-forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,in_frequency,anomalies=T,multi_seasonal=F,method='autoforecast',plot=F) {
-  
-  ### /DATASET HANDLING ###
-  mkt_data_src<-mkt_data[mkt_data$ForecastGroup==ForecastGroup&mkt_data$web==web_id,]
-  #check if there are any records on this metric/source
-  if (nrow(mkt_data_src)==0) { return(mkt_data_src) }
-  mkt_data_src_all<-fill_the_dates(mkt_data_src,metrics)
-  
-  forecast_df<-list()
-  for (metric in metrics) {
-    mkt_data_src<-mkt_data_src_all[,c('date',metric)]
-    mkt_data_src<-mkt_data_src[order(mkt_data_src$date),]
     mkt_data_src<-mkt_data_src[(min(which(diff(mkt_data_src[,2])>0))+1):nrow(mkt_data_src),]
     ### DATASET HANDLING/ ###
     

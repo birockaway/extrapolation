@@ -102,7 +102,9 @@ forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,i
   for (metric in metrics) {
     mkt_data_src<-mkt_data_src_all[,c('date',metric)]
     mkt_data_src<-mkt_data_src[order(mkt_data_src$date),]
-    mkt_data_src<-mkt_data_src[(min(which(diff(mkt_data_src[,2])>0))+1):nrow(mkt_data_src),]
+    if (sum(diff(mkt_data_src[,2])>0)){
+      mkt_data_src<-mkt_data_src[(min(which(diff(mkt_data_src[,2])>0))+1):nrow(mkt_data_src),]
+    }
     ### DATASET HANDLING/ ###
     
     

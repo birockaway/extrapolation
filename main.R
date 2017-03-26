@@ -102,7 +102,7 @@ forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,i
   for (metric in metrics) {
     mkt_data_src<-mkt_data_src_all[,c('date',metric)]
     mkt_data_src<-mkt_data_src[order(mkt_data_src$date),]
-    if (sum(diff(mkt_data_src[,2])>0)){
+    if (sum(diff(mkt_data_src[,2])>0)>0){
       mkt_data_src<-mkt_data_src[(min(which(diff(mkt_data_src[,2])>0))+1):nrow(mkt_data_src),]
     }
     ### DATASET HANDLING/ ###
@@ -118,7 +118,7 @@ forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,i
     
     #forecast
     if ((nrow(mkt_data_src)/in_frequency)<=2) {
-      fcst_end_of_month_vals<-rep(mean(mkt_data_src[,metric]),days_of_month_remain())
+      fcst_end_of_month_vals<-rep(mean(mkt_data_src[,metric]),31*3)
     }else{
       options(warn=-1)
       if (multi_seasonal==T&metric!="cost"&((length(mkt_data_src[,metric])-min(which(mkt_data_src[,metric]>0)))>365*2)) {

@@ -29,9 +29,9 @@ if (my_environment=='devel') {
 ### /FUNCTIONS DECLARATION SECTION ###
 
 # END_OF_MONTH FCN
-days_of_month_remain = function() {
-  current_month<-(as.POSIXlt(Sys.Date()-1,tz='UTC'))$mon
-  date_add<-as.POSIXlt(Sys.Date()-1,tz='UTC')
+days_of_month_remain = function(prediction_date=Sys.Date()) {
+  current_month<-(as.POSIXlt(prediction_date-1,tz='UTC'))$mon
+  date_add<-as.POSIXlt(prediction_date-1,tz='UTC')
   i<-0
   while (date_add$mon==current_month){
     i<-i+1
@@ -40,9 +40,9 @@ days_of_month_remain = function() {
   return (i)
 }
 
-fill_the_dates=function(df,metrics){
+fill_the_dates=function(df,metrics,prediction_date=Sys.Date()){
   df<-df[as.POSIXct(df$date)>=as.POSIXct('2014-01-01'),]
-  dates<-seq(as.POSIXct(min(df$date),tz='UTC'), as.POSIXct(Sys.Date()-1,tz='UTC'), "days")
+  dates<-seq(as.POSIXct(min(df$date),tz='UTC'), as.POSIXct(prediction_date-1,tz='UTC'), "days")
   missing_index<-!(dates %in% df$date)
   
   fill_up<-df[1,]
@@ -90,13 +90,13 @@ remove_anomalies=function(mkt_ts,max_anoms=0.05,metric){
 }
 
 #Forecast fcn
-forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,in_frequency,anomalies=T,multi_seasonal=F,method='autoforecast',plot=F) {
+forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,in_frequency,anomalies=T,multi_seasonal=F,method='autoforecast',plot=F,prediction_date=Sys.Date()) {
   
   ### /DATASET HANDLING ###
   mkt_data_src<-mkt_data[mkt_data$ForecastGroup==ForecastGroup&mkt_data$web==web_id,]
   #check if there are any records on this metric/source
   if (nrow(mkt_data_src)==0) { return(mkt_data_src) }
-  mkt_data_src_all<-fill_the_dates(mkt_data_src,metrics)
+  mkt_data_src_all<-fill_the_dates(mkt_data_src,metrics,prediction_date)
   
   forecast_df<-list()
   for (metric in metrics) {
@@ -133,11 +133,11 @@ forecast_this_month=function(mkt_data,metrics,web_id,ForecastGroup,ChannelType,i
         if (anomalies==T) {mkt_data_src<-remove_anomalies(mkt_data_src,max_anoms=0.05,metric)}
         ### ANOMALY DETECTION/ ###
         if (method=='autoarima') {
-          mkt_data_src<-mkt_data_src[mkt_data_src$date>as.POSIXct(Sys.Date()-120,tz='UTC'),]
+          mkt_data_src<-mkt_data_src[mkt_data_src$date>as.POSIXct(prediction_date-120,tz='UTC'),]
           mkt_data_src_ts<-ts(mkt_data_src[,metric],frequency = in_frequency)
           fcst_end_of_month_vals<-forecast(auto.arima(mkt_data_src_ts),31*3)$mean
         } else {
-          mkt_data_src<-mkt_data_src[mkt_data_src$date>as.POSIXct(Sys.Date()-120,tz='UTC'),]
+          mkt_data_src<-mkt_data_src[mkt_data_src$date>as.POSIXct(prediction_date-120,tz='UTC'),]
           mkt_data_src_ts<-ts(mkt_data_src[,metric],frequency = in_frequency)
           fcst_end_of_month_vals<-forecast(stl(mkt_data_src_ts,s.window=7),h=31*3)$mean
         }
@@ -193,7 +193,7 @@ select_metrics<-function(parameters){
 ### FUNCTIONS DECLARATION SECTION/ ###
 
 
-
+prediction_date=Sys.Date()
 
 ### /DATASET HANDLING ###
 sources_bridge<-read.csv("in/tables/sources_bridge.csv",stringsAsFactors = F)
@@ -210,14 +210,14 @@ mkt_data<-mkt_data[!is.na(mkt_data$ForecastGroup),]
 ### DATASET HANDLING/ ###
 
 #results
-mkt_data_out<-mkt_data[,c("ForecastGroup","web","date",metrics)]
+mkt_data_out<-mkt_data[mkt_data$date<as.POSIXct(prediction_date,tz='UTC'),c("ForecastGroup","web","date",metrics)]
 #mkt_data_out2<-mkt_data
 
 # select all valid ForecastGroups
 ForecastGroups<-unique(mkt_data$ForecastGroup)
 
 # cut data to the current day
-mkt_data<-mkt_data[mkt_data$date<as.POSIXct(Sys.Date(),tz='UTC'),]
+mkt_data<-mkt_data[mkt_data$date<as.POSIXct(prediction_date,tz='UTC'),]
 #ChannelTypes<-unique(sources_bridge$ChannelType)
 #ForecastGroup<-ForecastGroups[1]
 #web_id<-web_ids[2]
@@ -228,8 +228,8 @@ for (web_id in web_ids) {
   print(paste("Web_id",web_id,"ready to forecast..."))
   for (ForecastGroup in ForecastGroups) {
     ChannelType<-sources_bridge[sources_bridge$ForecastGroup==ForecastGroup,'ChannelType'][1]
-    #undebug(forecast_this_month)
-    forecast<-forecast_this_month(mkt_data,metrics,web_id,ForecastGroup,ChannelType,in_frequency=7,anomalies=F,multi_seasonal =T,plot=F)
+    #debugonce(forecast_this_month)
+    forecast<-forecast_this_month(mkt_data,metrics,web_id,ForecastGroup,ChannelType,in_frequency=7,anomalies=F,multi_seasonal =T,plot=F,prediction_date=prediction_date)
     #compare plot
     mkt_data_src<-mkt_data[mkt_data$ForecastGroup==ForecastGroup,]
     mkt_data_src<-mkt_data_src[order(mkt_data_src$date),]
@@ -237,7 +237,7 @@ for (web_id in web_ids) {
     #mkt_data_src<-rbind(mkt_data_src[,c('ForecastGroup','web','date',metric)],forecast2[,c('ForecastGroup','web','date',metric)])
     if (nrow(mkt_data_src[mkt_data_src$web==web_id,])>0 & do_plot==T) {
       #plot prvni metriky
-      mkt_data_src<-fill_the_dates(mkt_data_src[mkt_data_src$web==web_id,],metrics)
+      mkt_data_src<-fill_the_dates(mkt_data_src[mkt_data_src$web==web_id,],metrics,prediction_date)
       plot(c(mkt_data_src[mkt_data_src$web==web_id,metrics[1]],rep(NA,nrow(forecast))),type='l',main=ForecastGroup,ylim=c(min(min(mkt_data_src[,metrics[1]]),min(mkt_data_src[,metrics[2]])),max(max(mkt_data_src[,metrics[1]]),max(mkt_data_src[,metrics[2]]))))
       lines(c(rep(NA,nrow(mkt_data_src[mkt_data_src$web==web_id,])),forecast[,metrics[1]]),type='l',col='red')
       #lines(c(rep(NA,nrow(mkt_data_src[mkt_data_src$web==web_id,])),forecast2[,metrics[1]]),type='l',col='green')
@@ -262,9 +262,9 @@ mkt_data_out<-mkt_formating(mkt_data_out,sources_bridge)
 
 #snapshotting on specific days of month
 snapshotting_days<-c(1,10,20,30)
-if (as.numeric(days(Sys.Date()))%in%snapshotting_days) {
+if (as.numeric(days(prediction_date))%in%snapshotting_days) {
   mkt_data_out_snap<-mkt_data_out
-  mkt_data_out_snap[,"snap_date"]<-Sys.Date()
+  mkt_data_out_snap[,"snap_date"]<-prediction_date
 } else {
   mkt_data_out_snap<-mkt_data_out[numeric(0),]
   mkt_data_out_snap[,"snap_date"]<-numeric(0)
@@ -272,3 +272,8 @@ if (as.numeric(days(Sys.Date()))%in%snapshotting_days) {
 
 #write.csv(mkt_data_out_snap,file = "out/tables/extrapolation_out_snap.csv", row.names = FALSE)
 write.csv(mkt_data_out,file = "out/tables/extrapolation_out.csv", row.names = FALSE)
+
+
+
+shops<-c("prodeti.cz", "bambino.sk", "bigbrands.cz", "bigbrands.sk", "rozbaleno.cz", "rozbalene.sk", "kolonial.cz", "bux.cz")
+pks<-as.numeric(sapply(shops,function(shop) structure[structure$sales_channel==shop,'pk']))

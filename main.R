@@ -193,34 +193,34 @@ select_metrics<-function(parameters){
 ### FUNCTIONS DECLARATION SECTION/ ###
 
 
-prediction_date=Sys.Date()
+prediction_date=as.POSIXct(Sys.Date()-1) #as.POSIXct('2017-06-05',tz='UTC') 
 
 ### /DATASET HANDLING ###
 sources_bridge<-read.csv("in/tables/sources_bridge.csv",stringsAsFactors = F)
 structure<-read.csv("in/tables/structure.csv",stringsAsFactors = F)
-mkt_data_original<-read.csv("in/tables/extrapolation_ini.csv",stringsAsFactors = F)
+mkt_data<-read.csv("in/tables/extrapolation_ini.csv",stringsAsFactors = F)
 
+# select all valid ForecastGroups, metrics and web_ids
+ForecastGroups<-unique(mkt_data$ForecastGroup)
 metrics<-select_metrics(app$getParameters())
 web_ids<-select_web_ids(app$getParameters(),structure)
 
-mkt_data<-mkt_data_original
 mkt_data$date<-as.POSIXct(mkt_data$date,tz='UTC')
-mkt_data<-mkt_data[!is.na(mkt_data$ForecastGroup),]
-#mkt_data$ForecastGroup<-sapply(1:nrow(mkt_data), function(x) sources_bridge[sources_bridge$id==(mkt_data[x,"sources_bridge_id"]),"ForecastGroup"])
-### DATASET HANDLING/ ###
 
+# alter prediction_date to last non-empty date
+for (i in 1:6) {
+  date_check=prediction_date-60*60*24
+  refference_date=prediction_date-7*60*60*24
+  if ((nrow(mkt_data[mkt_data$date==date_check,])/nrow(mkt_data[mkt_data$date==refference_date,]))<=0.1){
+    prediction_date=date_check
+  }
+}
+
+mkt_data<-mkt_data[!is.na(mkt_data$ForecastGroup)&mkt_data$date<prediction_date&mkt_data$date>=as.POSIXct('2013-01-01',tz='UTC'),c("ForecastGroup","web","date",metrics)]
 #results
-mkt_data_out<-mkt_data[mkt_data$date<as.POSIXct(prediction_date,tz='UTC'),c("ForecastGroup","web","date",metrics)]
-#mkt_data_out2<-mkt_data
+mkt_data_out<-mkt_data
 
-# select all valid ForecastGroups
-ForecastGroups<-unique(mkt_data$ForecastGroup)
-
-# cut data to the current day
-mkt_data<-mkt_data[mkt_data$date<as.POSIXct(prediction_date,tz='UTC'),]
-#ChannelTypes<-unique(sources_bridge$ChannelType)
-#ForecastGroup<-ForecastGroups[1]
-#web_id<-web_ids[2]
+### DATASET HANDLING/ ###
 
 
 
@@ -272,8 +272,3 @@ if (as.numeric(days(prediction_date))%in%snapshotting_days) {
 
 #write.csv(mkt_data_out_snap,file = "out/tables/extrapolation_out_snap.csv", row.names = FALSE)
 write.csv(mkt_data_out,file = "out/tables/extrapolation_out.csv", row.names = FALSE)
-
-
-
-shops<-c("prodeti.cz", "bambino.sk", "bigbrands.cz", "bigbrands.sk", "rozbaleno.cz", "rozbalene.sk", "kolonial.cz", "bux.cz")
-pks<-as.numeric(sapply(shops,function(shop) structure[structure$sales_channel==shop,'pk']))
